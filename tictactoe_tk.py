@@ -7,12 +7,9 @@
 特徴:
 - GUIインターフェース（tkinter使用）
 - 先手後手の選択が可能
-- 最適な手を選択するAI
-- 白背景に青のX、黒のOで表示
-
-作者: Your Name
-作成日: 2024/03/09
-バージョン: 1.0
+- 3種類のAIアルゴリズム（ランダム、ミニマックス、完全戦略）
+- 対戦履歴のデータベース保存
+- 統計情報の表示機能
 
 プロンプト例:
 1. 基本機能の実装:
@@ -498,11 +495,11 @@ class TicTacToe:
     def _show_winner_message(self, winner: str) -> None:
         """勝者メッセージを表示し、結果を保存します。"""
         winner_text = "プレイヤー" if winner == self._get_player_mark(True) else "コンピュータ"
-        
+
         # ダイアログの位置を計算（ウィンドウの右側に表示）
         x = self.window.winfo_x() + self.window.winfo_width() + 10
         y = self.window.winfo_y() + self.window.winfo_height() // 3
-        
+
         # カスタムダイアログを作成
         dialog = tk.Toplevel(self.window)
         dialog.title("ゲーム終了")
@@ -510,15 +507,15 @@ class TicTacToe:
         dialog.transient(self.window)  # メインウィンドウの子として設定
         dialog.grab_set()  # モーダルダイアログとして設定
         dialog.configure(bg="lightblue")  # 背景色を薄い青に設定
-        
+
         # メッセージを表示
         message = tk.Label(dialog, text=f"{winner_text}の勝ち!", bg="lightblue", fg="darkblue")
         message.pack(padx=20, pady=10)
-        
+
         # OKボタン
         ok_button = tk.Button(dialog, text="OK", command=dialog.destroy, bg="lightblue", fg="darkblue")
         ok_button.pack(pady=(0, 10))
-        
+
         # ダイアログが閉じられるのを待つ
         self.window.wait_window(dialog)
 
@@ -537,7 +534,7 @@ class TicTacToe:
         # ダイアログの位置を計算（ウィンドウの右側に表示）
         x = self.window.winfo_x() + self.window.winfo_width() + 10
         y = self.window.winfo_y() + self.window.winfo_height() // 3
-        
+
         # カスタムダイアログを作成
         dialog = tk.Toplevel(self.window)
         dialog.title("ゲーム終了")
@@ -545,15 +542,15 @@ class TicTacToe:
         dialog.transient(self.window)  # メインウィンドウの子として設定
         dialog.grab_set()  # モーダルダイアログとして設定
         dialog.configure(bg="lightblue")  # 背景色を薄い青に設定
-        
+
         # メッセージを表示
         message = tk.Label(dialog, text="引き分け!", bg="lightblue", fg="darkblue")
         message.pack(padx=20, pady=10)
-        
+
         # OKボタン
         ok_button = tk.Button(dialog, text="OK", command=dialog.destroy, bg="lightblue", fg="darkblue")
         ok_button.pack(pady=(0, 10))
-        
+
         # ダイアログが閉じられるのを待つ
         self.window.wait_window(dialog)
 

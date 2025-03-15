@@ -22,8 +22,6 @@
      人間が先手かどうか
    - winner: CHAR(1) NOT NULL
      勝者（'H':人間, 'C':コンピュータ, 'D':引き分け）
-   - INDEX idx_algorithm_date (algorithm_id, played_at)
-     アルゴリズムと日付による検索用インデックス
 
 3. moves テーブル（手順履歴）
    - game_id: INTEGER NOT NULL
@@ -37,17 +35,19 @@
    - PRIMARY KEY (game_id, move_number)
      ゲームIDと手番の複合主キー
 
-4. perfect_moves テーブル（完全戦略データ）
-   - state: CHAR(9) NOT NULL
+4. board_states テーブル（完全戦略データ）
+   - state_id: TEXT PRIMARY KEY
+     盤面状態のユニークID
+   - board_state: TEXT NOT NULL
      盤面状態（'-XO'の9文字）
-   - next_player: CHAR(1) NOT NULL
+   - next_player: TEXT NOT NULL
      次の手番（'X' または 'O'）
    - best_move: INTEGER
      最適な手の位置（0-8、終局状態の場合はNULL）
-   - score: INTEGER NOT NULL
+   - evaluation: INTEGER NOT NULL
      評価値（1:X勝ち, 0:引分, -1:O勝ち）
-   - PRIMARY KEY (state, next_player)
-     盤面状態と手番の複合主キー
+   - is_terminal: BOOLEAN NOT NULL
+     終局状態かどうか
 """
 
 import sqlite3
@@ -113,12 +113,13 @@ class DatabaseManager:
 
             # 完全戦略データ
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS perfect_moves (
-                    state CHAR(9) NOT NULL,
-                    next_player CHAR(1) NOT NULL,
+                CREATE TABLE IF NOT EXISTS board_states (
+                    state_id TEXT PRIMARY KEY,
+                    board_state TEXT NOT NULL,
+                    next_player TEXT NOT NULL,
                     best_move INTEGER,
-                    score INTEGER NOT NULL,
-                    PRIMARY KEY (state, next_player)
+                    evaluation INTEGER NOT NULL,
+                    is_terminal BOOLEAN NOT NULL
                 )
             ''')
 

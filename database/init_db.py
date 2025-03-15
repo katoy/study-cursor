@@ -1,7 +1,8 @@
 """
 データベースの初期化スクリプト
 
-このスクリプトは、ゲーム履歴を保存するためのデータベースを初期化します。
+このスクリプトは、三目並べゲームの対戦履歴を保存するためのデータベースを初期化します。
+必要なテーブルとインデックスを作成し、初期データを設定します。
 """
 
 import sqlite3
@@ -13,7 +14,7 @@ def init_database() -> None:
     # データベースディレクトリの作成
     db_dir = Path(__file__).parent
     db_dir.mkdir(exist_ok=True)
-    
+
     # データベースファイルへの接続
     db_path = db_dir / "game_history.db"
     conn = sqlite3.connect(db_path)
@@ -33,7 +34,7 @@ def init_database() -> None:
 
     # インデックスの作成
     cursor.execute("""
-    CREATE INDEX IF NOT EXISTS idx_algorithm 
+    CREATE INDEX IF NOT EXISTS idx_algorithm
     ON game_history(algorithm)
     """)
 
@@ -43,4 +44,4 @@ def init_database() -> None:
 
 if __name__ == "__main__":
     init_database()
-    print("データベースの初期化が完了しました。") 
+    print("データベースの初期化が完了しました。")
