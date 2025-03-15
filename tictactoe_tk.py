@@ -498,7 +498,29 @@ class TicTacToe:
     def _show_winner_message(self, winner: str) -> None:
         """勝者メッセージを表示し、結果を保存します。"""
         winner_text = "プレイヤー" if winner == self._get_player_mark(True) else "コンピュータ"
-        messagebox.showinfo("ゲーム終了", f"{winner_text}の勝ち!")
+        
+        # ダイアログの位置を計算（ウィンドウの右側に表示）
+        x = self.window.winfo_x() + self.window.winfo_width() + 10
+        y = self.window.winfo_y() + self.window.winfo_height() // 3
+        
+        # カスタムダイアログを作成
+        dialog = tk.Toplevel(self.window)
+        dialog.title("ゲーム終了")
+        dialog.geometry(f"+{x}+{y}")  # ダイアログの位置を設定
+        dialog.transient(self.window)  # メインウィンドウの子として設定
+        dialog.grab_set()  # モーダルダイアログとして設定
+        dialog.configure(bg="lightblue")  # 背景色を薄い青に設定
+        
+        # メッセージを表示
+        message = tk.Label(dialog, text=f"{winner_text}の勝ち!", bg="lightblue", fg="darkblue")
+        message.pack(padx=20, pady=10)
+        
+        # OKボタン
+        ok_button = tk.Button(dialog, text="OK", command=dialog.destroy, bg="lightblue", fg="darkblue")
+        ok_button.pack(pady=(0, 10))
+        
+        # ダイアログが閉じられるのを待つ
+        self.window.wait_window(dialog)
 
         # 結果を保存
         self.db_manager.save_game(
@@ -512,7 +534,28 @@ class TicTacToe:
 
     def _show_draw_message(self) -> None:
         """引き分けメッセージを表示し、結果を保存します。"""
-        messagebox.showinfo("ゲーム終了", "引き分け!")
+        # ダイアログの位置を計算（ウィンドウの右側に表示）
+        x = self.window.winfo_x() + self.window.winfo_width() + 10
+        y = self.window.winfo_y() + self.window.winfo_height() // 3
+        
+        # カスタムダイアログを作成
+        dialog = tk.Toplevel(self.window)
+        dialog.title("ゲーム終了")
+        dialog.geometry(f"+{x}+{y}")  # ダイアログの位置を設定
+        dialog.transient(self.window)  # メインウィンドウの子として設定
+        dialog.grab_set()  # モーダルダイアログとして設定
+        dialog.configure(bg="lightblue")  # 背景色を薄い青に設定
+        
+        # メッセージを表示
+        message = tk.Label(dialog, text="引き分け!", bg="lightblue", fg="darkblue")
+        message.pack(padx=20, pady=10)
+        
+        # OKボタン
+        ok_button = tk.Button(dialog, text="OK", command=dialog.destroy, bg="lightblue", fg="darkblue")
+        ok_button.pack(pady=(0, 10))
+        
+        # ダイアログが閉じられるのを待つ
+        self.window.wait_window(dialog)
 
         # 結果を保存
         self.db_manager.save_game(
