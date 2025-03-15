@@ -58,7 +58,3 @@ python tictactoe_tk.py
 ## ライセンス
 
 このプロジェクトは[MITライセンス](LICENSE)の下で公開されています。
-
-## 作者
-
-[Your Name]
