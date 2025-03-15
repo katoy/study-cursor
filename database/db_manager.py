@@ -5,51 +5,58 @@
 
 データベーススキーマ:
 
-1. game_history テーブル（対戦履歴）
+1. algorithms テーブル（アルゴリズムマスタ）
+   - id: INTEGER PRIMARY KEY
+     アルゴリズムの一意の識別子
+   - name: TEXT NOT NULL UNIQUE
+     アルゴリズム名（"ランダム"/"ミニマックス"/"完全戦略"）
+
+2. game_results テーブル（対戦履歴）
    - id: INTEGER PRIMARY KEY AUTOINCREMENT
      対戦履歴の一意の識別子
    - played_at: TIMESTAMP NOT NULL
      対戦が行われた日時
+   - algorithm_id: INTEGER NOT NULL
+     使用したアルゴリズムのID（外部キー：algorithms.id）
    - human_is_first: BOOLEAN NOT NULL
-     人間が先手かどうか（true: 人間が先手、false: コンピュータが先手）
-   - algorithm: TEXT NOT NULL
-     使用したアルゴリズム（"ランダム"/"ミニマックス"/"完全戦略"）
-   - winner: TEXT NOT NULL
-     勝者（"プレイヤー"/"コンピュータ"/"引き分け"）
-   - moves: TEXT NOT NULL
-     手順の記録（[(位置, マーク), ...]の文字列形式）
+     人間が先手かどうか
+   - winner: CHAR(1) NOT NULL
+     勝者（'H':人間, 'C':コンピュータ, 'D':引き分け）
+   - INDEX idx_algorithm_date (algorithm_id, played_at)
+     アルゴリズムと日付による検索用インデックス
 
-2. board_states テーブル（完全戦略用の盤面データ）
-   - state_id: TEXT PRIMARY KEY
-     盤面状態の一意の識別子（"盤面文字列_次の手番"形式）
-   - board_state: TEXT NOT NULL
-     盤面の状態（空きマスは"-"で表現）
-   - next_player: TEXT NOT NULL
-     次の手番（"X" または "O"）
+3. moves テーブル（手順履歴）
+   - game_id: INTEGER NOT NULL
+     対戦履歴ID（外部キー：game_results.id）
+   - move_number: INTEGER NOT NULL
+     手番（1から始まる連番）
+   - position: INTEGER NOT NULL
+     配置位置（0-8）
+   - mark: CHAR(1) NOT NULL
+     マーク（'X' または 'O'）
+   - PRIMARY KEY (game_id, move_number)
+     ゲームIDと手番の複合主キー
+
+4. perfect_moves テーブル（完全戦略データ）
+   - state: CHAR(9) NOT NULL
+     盤面状態（'-XO'の9文字）
+   - next_player: CHAR(1) NOT NULL
+     次の手番（'X' または 'O'）
    - best_move: INTEGER
      最適な手の位置（0-8、終局状態の場合はNULL）
-   - evaluation: INTEGER NOT NULL
-     状態の評価値（1: Xの勝ち、0: 引分、-1: Oの勝ち）
-   - is_terminal: BOOLEAN NOT NULL
-     終局状態かどうか
+   - score: INTEGER NOT NULL
+     評価値（1:X勝ち, 0:引分, -1:O勝ち）
+   - PRIMARY KEY (state, next_player)
+     盤面状態と手番の複合主キー
 """
 
 import sqlite3
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 
 
 class DatabaseManager:
-    """データベース管理クラス。
-
-    このクラスは、対戦履歴の保存と取得を担当します。
-    SQLiteデータベースを使用して、以下の情報を管理します：
-    - 対戦日時
-    - プレイヤーの手番（先手/後手）
-    - 使用したAIアルゴリズム
-    - 勝者
-    - 対戦内容（手順）
-    """
+    """データベース管理クラス"""
 
     def __init__(self, db_path: str = "game_history.db") -> None:
         """初期化メソッド。
@@ -59,24 +66,78 @@ class DatabaseManager:
         """
         self.db_path = db_path
         self._create_tables()
+        self._initialize_algorithms()
 
     def _create_tables(self) -> None:
         """必要なテーブルを作成します。"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
-            # ゲーム履歴テーブル
+            # アルゴリズムマスタ
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS game_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    played_at TIMESTAMP NOT NULL,
-                    human_is_first BOOLEAN NOT NULL,
-                    algorithm TEXT NOT NULL,
-                    winner TEXT NOT NULL,
-                    moves TEXT NOT NULL
+                CREATE TABLE IF NOT EXISTS algorithms (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE
                 )
             ''')
 
+            # 対戦履歴
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS game_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    played_at TIMESTAMP NOT NULL,
+                    algorithm_id INTEGER NOT NULL,
+                    human_is_first BOOLEAN NOT NULL,
+                    winner CHAR(1) NOT NULL,
+                    FOREIGN KEY (algorithm_id) REFERENCES algorithms(id)
+                )
+            ''')
+
+            # インデックスの作成
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_algorithm_date
+                ON game_results (algorithm_id, played_at)
+            ''')
+
+            # 手順履歴
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS moves (
+                    game_id INTEGER NOT NULL,
+                    move_number INTEGER NOT NULL,
+                    position INTEGER NOT NULL,
+                    mark CHAR(1) NOT NULL,
+                    PRIMARY KEY (game_id, move_number),
+                    FOREIGN KEY (game_id) REFERENCES game_results(id)
+                )
+            ''')
+
+            # 完全戦略データ
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS perfect_moves (
+                    state CHAR(9) NOT NULL,
+                    next_player CHAR(1) NOT NULL,
+                    best_move INTEGER,
+                    score INTEGER NOT NULL,
+                    PRIMARY KEY (state, next_player)
+                )
+            ''')
+
+            conn.commit()
+
+    def _initialize_algorithms(self) -> None:
+        """アルゴリズムマスタを初期化します。"""
+        algorithms = [
+            (1, "ランダム"),
+            (2, "ミニマックス"),
+            (3, "完全戦略")
+        ]
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.executemany(
+                'INSERT OR IGNORE INTO algorithms (id, name) VALUES (?, ?)',
+                algorithms
+            )
             conn.commit()
 
     def save_game(self, human_is_first: bool, algorithm: str,
@@ -85,45 +146,99 @@ class DatabaseManager:
 
         Args:
             human_is_first: 人間が先手かどうか
-            algorithm: 使用したアルゴリズム
+            algorithm: 使用したアルゴリズム名
             winner: 勝者（"プレイヤー"/"コンピュータ"/"引き分け"）
             moves: 手順のリスト（(位置, マーク)のタプルのリスト）
         """
+        winner_map = {
+            "プレイヤー": "H",
+            "コンピュータ": "C",
+            "引き分け": "D"
+        }
+
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
+            # アルゴリズムIDの取得
+            cursor.execute('SELECT id FROM algorithms WHERE name = ?', (algorithm,))
+            algorithm_id = cursor.fetchone()[0]
+
+            # ゲーム結果の保存
             cursor.execute('''
-                INSERT INTO game_history (
-                    played_at, human_is_first, algorithm, winner, moves
-                ) VALUES (?, ?, ?, ?, ?)
+                INSERT INTO game_results (
+                    played_at, algorithm_id, human_is_first, winner
+                ) VALUES (?, ?, ?, ?)
             ''', (
                 datetime.now(),
+                algorithm_id,
                 human_is_first,
-                algorithm,
-                winner,
-                str(moves)  # 手順をテキストとして保存
+                winner_map[winner]
             ))
+
+            game_id = cursor.lastrowid
+
+            # 手順の保存
+            move_data = [
+                (game_id, i + 1, pos, mark)
+                for i, (pos, mark) in enumerate(moves)
+            ]
+            cursor.executemany('''
+                INSERT INTO moves (game_id, move_number, position, mark)
+                VALUES (?, ?, ?, ?)
+            ''', move_data)
 
             conn.commit()
 
-    def get_game_history(self, limit: Optional[int] = None) -> List[Tuple]:
+    def get_game_history(self, limit: Optional[int] = None) -> List[Dict]:
         """ゲーム履歴を取得します。
 
         Args:
             limit: 取得する履歴の数（Noneの場合は全件取得）
 
         Returns:
-            ゲーム履歴のリスト
+            ゲーム履歴のリスト（辞書形式）
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
-            query = "SELECT * FROM game_history ORDER BY played_at DESC"
+            query = '''
+                SELECT
+                    r.id,
+                    r.played_at,
+                    a.name as algorithm,
+                    r.human_is_first,
+                    CASE r.winner
+                        WHEN 'H' THEN 'プレイヤー'
+                        WHEN 'C' THEN 'コンピュータ'
+                        ELSE '引き分け'
+                    END as winner
+                FROM game_results r
+                JOIN algorithms a ON r.algorithm_id = a.id
+                ORDER BY r.played_at DESC
+            '''
+
             if limit is not None:
                 query += f" LIMIT {limit}"
 
             cursor.execute(query)
-            return cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+
+            for row in cursor.fetchall():
+                game_dict = dict(zip(columns, row))
+
+                # 手順の取得
+                cursor.execute('''
+                    SELECT position, mark
+                    FROM moves
+                    WHERE game_id = ?
+                    ORDER BY move_number
+                ''', (game_dict['id'],))
+
+                game_dict['moves'] = cursor.fetchall()
+                results.append(game_dict)
+
+            return results
 
     def get_statistics(self) -> dict:
         """統計情報を取得します。
@@ -134,16 +249,16 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
-            # アルゴリズムごとの勝敗数
             cursor.execute('''
                 SELECT
-                    algorithm,
+                    a.name as algorithm,
                     COUNT(*) as total_games,
-                    SUM(CASE WHEN winner = 'プレイヤー' THEN 1 ELSE 0 END) as human_wins,
-                    SUM(CASE WHEN winner = 'コンピュータ' THEN 1 ELSE 0 END) as computer_wins,
-                    SUM(CASE WHEN winner = '引き分け' THEN 1 ELSE 0 END) as draws
-                FROM game_history
-                GROUP BY algorithm
+                    SUM(CASE WHEN r.winner = 'H' THEN 1 ELSE 0 END) as human_wins,
+                    SUM(CASE WHEN r.winner = 'C' THEN 1 ELSE 0 END) as computer_wins,
+                    SUM(CASE WHEN r.winner = 'D' THEN 1 ELSE 0 END) as draws
+                FROM game_results r
+                JOIN algorithms a ON r.algorithm_id = a.id
+                GROUP BY a.name
             ''')
 
             stats = {}
