@@ -55,6 +55,7 @@ import tkinter as tk
 from tkinter import messagebox
 import math
 from typing import Dict, List, Optional, Any
+import random
 
 
 @dataclass
@@ -97,6 +98,7 @@ class TicTacToe:
         buttons: ボードのボタンリスト
         human_is_first: 人間が先手かどうか
         first_player_var: 先手プレイヤーの選択値
+        algorithm_var: アルゴリズム選択用の変数を追加
     """
 
     def __init__(self) -> None:
@@ -108,17 +110,32 @@ class TicTacToe:
         self.buttons: List[tk.Button] = []
         self.human_is_first = True
         self.first_player_var: tk.StringVar
+        self.algorithm_var: tk.StringVar  # アルゴリズム選択用の変数を追加
 
         self._setup_gui()
         self.window.resizable(False, False)
 
     def _setup_gui(self) -> None:
         """GUIコンポーネントの設定を行います。"""
+        self._create_menu_bar()  # メニューバーを追加
         main_frame = self._create_main_frame()
         self._create_player_selection(main_frame)
+        self._create_algorithm_selection(main_frame)  # アルゴリズム選択を追加
         board_frame = self._create_board_frame(main_frame)
         self._create_game_board(board_frame)
         self._create_reset_button(main_frame)
+
+    def _create_menu_bar(self) -> None:
+        """メニューバーを作成します。"""
+        menu_bar = tk.Menu(self.window)
+        self.window.config(menu=menu_bar)
+
+        # ゲームメニュー
+        game_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="ゲーム", menu=game_menu)
+        game_menu.add_command(label="リセット", command=self.reset_game)
+        game_menu.add_separator()
+        game_menu.add_command(label="終了", command=self.window.quit)
 
     def _create_main_frame(self) -> tk.Frame:
         """メインフレームを作成します。
@@ -162,6 +179,25 @@ class TicTacToe:
             command=self.change_first_player
         )
         first_player_menu.pack(side=tk.LEFT)
+
+    def _create_algorithm_selection(self, parent: tk.Frame) -> None:
+        """アルゴリズム選択部分のGUIを作成します。
+
+        Args:
+            parent: 親フレーム
+        """
+        select_frame = tk.Frame(parent)
+        select_frame.pack(pady=(0, 10))
+
+        tk.Label(select_frame, text="アルゴリズム: ").pack(side=tk.LEFT)
+        self.algorithm_var = tk.StringVar(value="ミニマックス")
+        algorithm_menu = tk.OptionMenu(
+            select_frame,
+            self.algorithm_var,
+            "ミニマックス",
+            "ランダム"
+        )
+        algorithm_menu.pack(side=tk.LEFT)
 
     def _create_game_board(self, parent: tk.Frame) -> None:
         """ゲームボードのGUIを作成します。
@@ -361,7 +397,15 @@ class TicTacToe:
 
     def computer_move(self) -> None:
         """コンピュータの手を処理します。"""
-        move = self.find_best_move()
+        if self.algorithm_var.get() == "ミニマックス":
+            move = self.find_best_move()
+        else:  # ランダム
+            empty_cells = [i for i, mark in enumerate(self.board) if mark == ""]
+            if empty_cells:
+                move = random.choice(empty_cells)
+            else:
+                move = -1
+
         if move != -1:
             self._make_move(move, is_human=False)
             self._check_game_end()
