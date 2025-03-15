@@ -1,0 +1,68 @@
+@startuml TicTacToe Database
+
+' スタイル設定
+!define table(x) class x << (T,#FFAAAA) >>
+!define primary_key(x) <u>x</u>
+hide methods
+hide stereotypes
+
+' アルゴリズムマスタ
+table(algorithms) {
+  primary_key(id): INTEGER
+  name: TEXT NOT NULL UNIQUE
+}
+
+' 対戦履歴
+table(game_results) {
+  primary_key(id): INTEGER
+  played_at: TIMESTAMP NOT NULL
+  algorithm_id: INTEGER NOT NULL
+  human_is_first: BOOLEAN NOT NULL
+  winner: CHAR(1) NOT NULL
+}
+
+' 手順履歴
+table(moves) {
+  primary_key(game_id): INTEGER
+  primary_key(move_number): INTEGER
+  position: INTEGER NOT NULL
+  mark: CHAR(1) NOT NULL
+}
+
+' 完全戦略データ
+table(perfect_moves) {
+  primary_key(state): CHAR(9)
+  primary_key(next_player): CHAR(1)
+  best_move: INTEGER
+  score: INTEGER NOT NULL
+}
+
+' リレーションシップ
+game_results }o--|| algorithms : algorithm_id
+moves }o--|| game_results : game_id
+
+note right of algorithms
+  アルゴリズム名:
+  - ランダム
+  - ミニマックス
+  - 完全戦略
+end note
+
+note right of game_results
+  winner:
+  - H: 人間
+  - C: コンピュータ
+  - D: 引き分け
+end note
+
+note right of moves
+  position: 0-8
+  mark: X または O
+end note
+
+note right of perfect_moves
+  state: -XO の9文字
+  score: 1=X勝ち, 0=引分, -1=O勝ち
+end note
+
+@enduml 

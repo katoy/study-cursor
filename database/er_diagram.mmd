@@ -1,0 +1,30 @@
+erDiagram
+    algorithms ||--o{ game_results : "algorithm_id"
+    game_results ||--o{ moves : "game_id"
+
+    algorithms {
+        int id PK
+        string name UK "NOT NULL"
+    }
+
+    game_results {
+        int id PK
+        timestamp played_at "NOT NULL"
+        int algorithm_id FK "NOT NULL"
+        boolean human_is_first "NOT NULL"
+        char winner "NOT NULL"
+    }
+
+    moves {
+        int game_id PK,FK
+        int move_number PK "NOT NULL"
+        int position "NOT NULL"
+        char mark "NOT NULL"
+    }
+
+    perfect_moves {
+        char state PK "NOT NULL"
+        char next_player PK "NOT NULL"
+        int best_move
+        int score "NOT NULL"
+    } 
