@@ -22,40 +22,54 @@
     - プレイヤーは'X'、コンピュータは'O'を使用
     - クリックでプレイヤーが手を打てる
     - 勝敗判定機能
-    - リセットボタン"
+    - リセットボタン
+    - 先手/後手の選択機能"
 
 2. AIの実装:
-   "三目並べゲームのコンピュータプレイヤーに、ミニマックスアルゴリズムとアルファベータ枝刈りを
-    実装してください。以下の要件を満たすようにしてください：
-    - 最適な手を選択できる
-    - 探索の深さを考慮した評価関数
-    - パフォーマンスを考慮した実装"
+   "三目並べゲームのコンピュータプレイヤーに、以下の3種類のAIを実装してください：
+    - ランダム選択: 空いているマスからランダムに選択
+    - ミニマックス: ミニマックスアルゴリズムとアルファベータ枝刈りを使用
+    - 完全戦略: 事前計算された最適手を使用
+    また、ゲーム中にAIを切り替えられるようにしてください。"
 
-3. UI/UXの改善:
+3. データベース機能:
+   "三目並べゲームにデータベース機能を追加してください：
+    - 対戦履歴の保存（日時、使用アルゴリズム、勝敗、手順）
+    - 統計情報の表示（アルゴリズムごとの勝率など）
+    - 完全戦略用の事前計算データの保存
+    - データベースが存在しない場合の自動生成機能"
+
+4. UI/UXの改善:
    "三目並べゲームのUIを改善してください：
-    - ボタンのサイズを100x100ピクセルに統一
-    - プレイヤーの'X'は青色、コンピュータの'O'は黒色で表示
-    - 背景色を白に統一
-    - 先手/後手を選択できるドロップダウンメニューの追加
-    - ゲーム終了時の結果表示をダイアログで実装"
+    - メニューバーの追加（リセット、統計表示、終了）
+    - アルゴリズム選択のドロップダウンメニュー
+    - 統計情報の表示（ツリービュー使用）
+    - ゲーム終了時のダイアログ表示
+    - 手番や状態の視覚的なフィードバック"
 
-4. コードの整理:
+5. コードの整理:
    "三目並べゲームのコードを以下の方針でリファクタリングしてください：
     - データクラスを使用した設定の分離
+    - エージェントパターンを使用したAIの実装
+    - データベース処理の分離
     - 型ヒントの追加
-    - メソッドの責務を明確に分割
     - ドキュメンテーションの充実
-    - 定数の適切な管理
     - エラー処理の改善"
 """
 
 from __future__ import annotations
 from dataclasses import dataclass
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import math
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 import random
+from agents.base_agent import BaseAgent
+from agents.minimax_agent import MinimaxAgent
+from agents.random_agent import RandomAgent
+from agents.perfect_agent import PerfectAgent
+from database.db_manager import DatabaseManager
+from pathlib import Path
 
 
 @dataclass
@@ -99,6 +113,10 @@ class TicTacToe:
         human_is_first: 人間が先手かどうか
         first_player_var: 先手プレイヤーの選択値
         algorithm_var: アルゴリズム選択用の変数を追加
+        agents: エージェントの辞書
+        current_agent: 現在のエージェント
+        db_manager: データベースマネージャー
+        moves_history: 手順の履歴
     """
 
     def __init__(self) -> None:
@@ -110,10 +128,36 @@ class TicTacToe:
         self.buttons: List[tk.Button] = []
         self.human_is_first = True
         self.first_player_var: tk.StringVar
-        self.algorithm_var: tk.StringVar  # アルゴリズム選択用の変数を追加
+        self.algorithm_var: tk.StringVar
+        self.agents = {
+            "ランダム": RandomAgent(),
+            "ミニマックス": MinimaxAgent(),
+            "完全戦略": PerfectAgent()
+        }
+        self.current_agent: BaseAgent = self.agents["完全戦略"]
+        self.db_manager = DatabaseManager()
+        self.moves_history: List[Tuple[int, str]] = []  # 手順の履歴
+
+        # 完全戦略用のデータベースが存在するか確認
+        self._check_and_generate_perfect_db()
 
         self._setup_gui()
         self.window.resizable(False, False)
+
+    def _check_and_generate_perfect_db(self) -> None:
+        """完全戦略用のデータベースをチェックし、必要に応じて生成します。"""
+        db_path = Path(__file__).parent / "database" / "game_history.db"
+        if not db_path.exists():
+            messagebox.showinfo(
+                "データベース生成",
+                "完全戦略用のデータベースを生成します。\nこれには数分かかる場合があります。"
+            )
+            from database.generate_all_states import generate_all_states
+            generate_all_states()
+            messagebox.showinfo(
+                "データベース生成完了",
+                "完全戦略用のデータベースの生成が完了しました。"
+            )
 
     def _setup_gui(self) -> None:
         """GUIコンポーネントの設定を行います。"""
@@ -123,7 +167,9 @@ class TicTacToe:
         self._create_algorithm_selection(main_frame)  # アルゴリズム選択を追加
         board_frame = self._create_board_frame(main_frame)
         self._create_game_board(board_frame)
+        self._create_stats_display(main_frame)
         self._create_reset_button(main_frame)
+        self._update_stats_display()
 
     def _create_menu_bar(self) -> None:
         """メニューバーを作成します。"""
@@ -134,6 +180,7 @@ class TicTacToe:
         game_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="ゲーム", menu=game_menu)
         game_menu.add_command(label="リセット", command=self.reset_game)
+        game_menu.add_command(label="統計表示", command=self._show_statistics)
         game_menu.add_separator()
         game_menu.add_command(label="終了", command=self.window.quit)
 
@@ -181,21 +228,17 @@ class TicTacToe:
         first_player_menu.pack(side=tk.LEFT)
 
     def _create_algorithm_selection(self, parent: tk.Frame) -> None:
-        """アルゴリズム選択部分のGUIを作成します。
-
-        Args:
-            parent: 親フレーム
-        """
+        """アルゴリズム選択部分のGUIを作成します。"""
         select_frame = tk.Frame(parent)
         select_frame.pack(pady=(0, 10))
 
         tk.Label(select_frame, text="アルゴリズム: ").pack(side=tk.LEFT)
-        self.algorithm_var = tk.StringVar(value="ミニマックス")
+        self.algorithm_var = tk.StringVar(value="完全戦略")
         algorithm_menu = tk.OptionMenu(
             select_frame,
             self.algorithm_var,
-            "ミニマックス",
-            "ランダム"
+            *self.agents.keys(),
+            command=self.change_algorithm
         )
         algorithm_menu.pack(side=tk.LEFT)
 
@@ -283,9 +326,75 @@ class TicTacToe:
         )
         reset_button.pack(pady=(10, 0))
 
+    def _create_stats_display(self, parent: tk.Frame) -> None:
+        """統計情報表示部分を作成します。"""
+        self.stats_frame = tk.Frame(parent)
+        self.stats_frame.pack(pady=10)
+
+        self.stats_label = tk.Label(
+            self.stats_frame,
+            text="",
+            font=(self.config.FONT_FAMILY, 10)
+        )
+        self.stats_label.pack()
+
+    def _update_stats_display(self) -> None:
+        """統計情報の表示を更新します。"""
+        stats = self.db_manager.get_statistics()
+        current_algo = self.algorithm_var.get()
+
+        if current_algo in stats:
+            algo_stats = stats[current_algo]
+            self.stats_label.config(text=(
+                f"統計: {algo_stats['total_games']}局 "
+                f"(勝:{algo_stats['human_wins']} "
+                f"敗:{algo_stats['computer_wins']} "
+                f"分:{algo_stats['draws']}) "
+                f"勝率:{algo_stats['human_win_rate']*100:.1f}%"
+            ))
+        else:
+            self.stats_label.config(text="統計: まだ対戦記録がありません")
+
+    def _show_statistics(self) -> None:
+        """統計情報ウィンドウを表示します。"""
+        stats_window = tk.Toplevel(self.window)
+        stats_window.title("対戦統計")
+        stats_window.geometry("400x300")
+
+        # ツリービューの作成
+        tree = ttk.Treeview(stats_window, columns=("1", "2", "3", "4", "5"), show="headings")
+        tree.heading("1", text="アルゴリズム")
+        tree.heading("2", text="対戦数")
+        tree.heading("3", text="勝ち")
+        tree.heading("4", text="負け")
+        tree.heading("5", text="引分")
+
+        # スクロールバーの追加
+        scrollbar = ttk.Scrollbar(stats_window, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+
+        # 統計データの取得と表示
+        stats = self.db_manager.get_statistics()
+        for algo, data in stats.items():
+            tree.insert("", "end", values=(
+                algo,
+                data['total_games'],
+                data['human_wins'],
+                data['computer_wins'],
+                data['draws']
+            ))
+
+        tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
     def change_first_player(self, *_args: Any) -> None:
         """先手プレイヤーの変更とゲームのリセットを行います。"""
         self.human_is_first = self.first_player_var.get() == "人間"
+        self.reset_game()
+
+    def change_algorithm(self, *_args: Any) -> None:
+        """アルゴリズムを変更します。"""
+        self.current_agent = self.agents[self.algorithm_var.get()]
         self.reset_game()
 
     def button_click(self, row: int, col: int) -> None:
@@ -297,9 +406,14 @@ class TicTacToe:
         """
         index = self._get_index(row, col)
         if self.board[index] == "":
+            # 人間の手を処理
             self._make_move(index, is_human=True)
+            self.window.update()  # GUIを即座に更新
+
+            # ゲーム終了をチェック
             if not self._check_game_end():
-                self.computer_move()
+                # コンピュータの手を処理
+                self.window.after(100, self.computer_move)  # 少し遅延を入れて処理
 
     def _get_index(self, row: int, col: int) -> int:
         """行と列からインデックスを計算します。
@@ -324,6 +438,7 @@ class TicTacToe:
         color = self._get_mark_color(mark)
 
         self.board[index] = mark
+        self.moves_history.append((index, mark))  # 手順を記録
         self.buttons[index].config(
             text=mark,
             fg=color,
@@ -381,32 +496,39 @@ class TicTacToe:
         return "" not in self.board
 
     def _show_winner_message(self, winner: str) -> None:
-        """勝者メッセージを表示します。
-
-        Args:
-            winner: 勝者のマーク
-        """
+        """勝者メッセージを表示し、結果を保存します。"""
         winner_text = "プレイヤー" if winner == self._get_player_mark(True) else "コンピュータ"
         messagebox.showinfo("ゲーム終了", f"{winner_text}の勝ち!")
+
+        # 結果を保存
+        self.db_manager.save_game(
+            human_is_first=self.human_is_first,
+            algorithm=self.current_agent.name,
+            winner=winner_text,
+            moves=self.moves_history
+        )
+        self._update_stats_display()
         self.reset_game()
 
     def _show_draw_message(self) -> None:
-        """引き分けメッセージを表示します。"""
+        """引き分けメッセージを表示し、結果を保存します。"""
         messagebox.showinfo("ゲーム終了", "引き分け!")
+
+        # 結果を保存
+        self.db_manager.save_game(
+            human_is_first=self.human_is_first,
+            algorithm=self.current_agent.name,
+            winner="引き分け",
+            moves=self.moves_history
+        )
+        self._update_stats_display()
         self.reset_game()
 
     def computer_move(self) -> None:
         """コンピュータの手を処理します。"""
-        if self.algorithm_var.get() == "ミニマックス":
-            move = self.find_best_move()
-        else:  # ランダム
-            empty_cells = [i for i, mark in enumerate(self.board) if mark == ""]
-            if empty_cells:
-                move = random.choice(empty_cells)
-            else:
-                move = -1
-
-        if move != -1:
+        player_mark = self._get_player_mark(False)
+        move = self.current_agent.get_move(self.board, player_mark)
+        if move is not None:
             self._make_move(move, is_human=False)
             self._check_game_end()
 
@@ -564,6 +686,7 @@ class TicTacToe:
     def reset_game(self) -> None:
         """ゲームをリセットします。"""
         self.board = [""] * (self.config.BOARD_SIZE ** 2)
+        self.moves_history = []  # 手順履歴をリセット
         for button in self.buttons:
             button.config(
                 text="",
