@@ -9,49 +9,6 @@
 - 先手後手の選択が可能
 - 3種類のAIアルゴリズム（ランダム、ミニマックス、完全戦略）
 - 対戦履歴のデータベース保存
-- 統計情報の表示機能
-
-プロンプト例:
-1. 基本機能の実装:
-   "Pythonとtkinterを使用して、人間とコンピュータが対戦できる三目並べゲームを作成してください。
-    以下の機能を実装してください：
-    - 3x3のグリッドボード
-    - プレイヤーは'X'、コンピュータは'O'を使用
-    - クリックでプレイヤーが手を打てる
-    - 勝敗判定機能
-    - リセットボタン
-    - 先手/後手の選択機能"
-
-2. AIの実装:
-   "三目並べゲームのコンピュータプレイヤーに、以下の3種類のAIを実装してください：
-    - ランダム選択: 空いているマスからランダムに選択
-    - ミニマックス: ミニマックスアルゴリズムとアルファベータ枝刈りを使用
-    - 完全戦略: 事前計算された最適手を使用
-    また、ゲーム中にAIを切り替えられるようにしてください。"
-
-3. データベース機能:
-   "三目並べゲームにデータベース機能を追加してください：
-    - 対戦履歴の保存（日時、使用アルゴリズム、勝敗、手順）
-    - 統計情報の表示（アルゴリズムごとの勝率など）
-    - 完全戦略用の事前計算データの保存
-    - データベースが存在しない場合の自動生成機能"
-
-4. UI/UXの改善:
-   "三目並べゲームのUIを改善してください：
-    - メニューバーの追加（リセット、統計表示、終了）
-    - アルゴリズム選択のドロップダウンメニュー
-    - 統計情報の表示（ツリービュー使用）
-    - ゲーム終了時のダイアログ表示
-    - 手番や状態の視覚的なフィードバック"
-
-5. コードの整理:
-   "三目並べゲームのコードを以下の方針でリファクタリングしてください：
-    - データクラスを使用した設定の分離
-    - エージェントパターンを使用したAIの実装
-    - データベース処理の分離
-    - 型ヒントの追加
-    - ドキュメンテーションの充実
-    - エラー処理の改善"
 """
 
 from __future__ import annotations
@@ -164,9 +121,7 @@ class TicTacToe:
         self._create_algorithm_selection(main_frame)  # アルゴリズム選択を追加
         board_frame = self._create_board_frame(main_frame)
         self._create_game_board(board_frame)
-        self._create_stats_display(main_frame)
         self._create_reset_button(main_frame)
-        self._update_stats_display()
 
     def _create_menu_bar(self) -> None:
         """メニューバーを作成します。"""
@@ -177,7 +132,6 @@ class TicTacToe:
         game_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="ゲーム", menu=game_menu)
         game_menu.add_command(label="リセット", command=self.reset_game)
-        game_menu.add_command(label="統計表示", command=self._show_statistics)
         game_menu.add_separator()
         game_menu.add_command(label="終了", command=self.window.quit)
 
@@ -323,67 +277,6 @@ class TicTacToe:
         )
         reset_button.pack(pady=(10, 0))
 
-    def _create_stats_display(self, parent: tk.Frame) -> None:
-        """統計情報表示部分を作成します。"""
-        self.stats_frame = tk.Frame(parent)
-        self.stats_frame.pack(pady=10)
-
-        self.stats_label = tk.Label(
-            self.stats_frame,
-            text="",
-            font=(self.config.FONT_FAMILY, 10)
-        )
-        self.stats_label.pack()
-
-    def _update_stats_display(self) -> None:
-        """統計情報の表示を更新します。"""
-        stats = self.db_manager.get_statistics()
-        current_algo = self.algorithm_var.get()
-
-        if current_algo in stats:
-            algo_stats = stats[current_algo]
-            self.stats_label.config(text=(
-                f"統計: {algo_stats['total_games']}局 "
-                f"(勝:{algo_stats['human_wins']} "
-                f"敗:{algo_stats['computer_wins']} "
-                f"分:{algo_stats['draws']}) "
-                f"勝率:{algo_stats['human_win_rate']*100:.1f}%"
-            ))
-        else:
-            self.stats_label.config(text="統計: まだ対戦記録がありません")
-
-    def _show_statistics(self) -> None:
-        """統計情報ウィンドウを表示します。"""
-        stats_window = tk.Toplevel(self.window)
-        stats_window.title("対戦統計")
-        stats_window.geometry("400x300")
-
-        # ツリービューの作成
-        tree = ttk.Treeview(stats_window, columns=("1", "2", "3", "4", "5"), show="headings")
-        tree.heading("1", text="アルゴリズム")
-        tree.heading("2", text="対戦数")
-        tree.heading("3", text="勝ち")
-        tree.heading("4", text="負け")
-        tree.heading("5", text="引分")
-
-        # スクロールバーの追加
-        scrollbar = ttk.Scrollbar(stats_window, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=scrollbar.set)
-
-        # 統計データの取得と表示
-        stats = self.db_manager.get_statistics()
-        for algo, data in stats.items():
-            tree.insert("", "end", values=(
-                algo,
-                data['total_games'],
-                data['human_wins'],
-                data['computer_wins'],
-                data['draws']
-            ))
-
-        tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
     def change_first_player(self, *_args: Any) -> None:
         """先手プレイヤーの変更とゲームのリセットを行います。"""
         self.human_is_first = self.first_player_var.get() == "人間"
@@ -495,6 +388,7 @@ class TicTacToe:
     def _show_winner_message(self, winner: str) -> None:
         """勝者メッセージを表示し、結果を保存します。"""
         winner_text = "プレイヤー" if winner == self._get_player_mark(True) else "コンピュータ"
+        db_winner = "HUMAN" if winner == self._get_player_mark(True) else "COMPUTER"
 
         # ダイアログの位置を計算（ウィンドウの右側に表示）
         x = self.window.winfo_x() + self.window.winfo_width() + 10
@@ -521,12 +415,10 @@ class TicTacToe:
 
         # 結果を保存
         self.db_manager.save_game(
-            human_is_first=self.human_is_first,
-            algorithm=self.current_agent.name,
-            winner=winner_text,
+            is_human_first=self.human_is_first,
+            winner=db_winner,
             moves=self.moves_history
         )
-        self._update_stats_display()
         self.reset_game()
 
     def _show_draw_message(self) -> None:
@@ -556,12 +448,10 @@ class TicTacToe:
 
         # 結果を保存
         self.db_manager.save_game(
-            human_is_first=self.human_is_first,
-            algorithm=self.current_agent.name,
-            winner="引き分け",
+            is_human_first=self.human_is_first,
+            winner="DRAW",
             moves=self.moves_history
         )
-        self._update_stats_display()
         self.reset_game()
 
     def computer_move(self) -> None:

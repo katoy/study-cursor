@@ -45,9 +45,26 @@ python tictactoe_tk.py
 └── database/           # データベース関連
     ├── db_manager.py   # データベース管理
     ├── init_db.py      # 初期化スクリプト
+    ├── er_diagram.mmd  # ER図（Mermaid形式）
+    ├── er_diagram.png  # ER図（PNG形式）
     └── generate_all_states.py # 完全戦略データ生成
-
 ```
+
+## ER図の生成
+
+データベース設計のER図は[Mermaid](https://mermaid.js.org/)形式で作成しています。
+ER図を更新する場合は以下の手順で行います：
+
+1. `database/er_diagram.mmd`を編集
+2. mermaid-cliをインストール
+   ```bash
+   npm init -y
+   npm install @mermaid-js/mermaid-cli
+   ```
+3. PNGファイルを生成
+   ```bash
+   ./node_modules/.bin/mmdc -i database/er_diagram.mmd -o database/er_diagram.png -c database/config.json -b transparent -w 1200 -H 800
+   ```
 
 ## 開発環境
 

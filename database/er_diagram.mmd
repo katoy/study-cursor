@@ -1,30 +1,34 @@
+---
+title: 三目並べゲームデータベース設計
+---
 erDiagram
-    algorithms ||--o{ game_results : "algorithm_id"
-    game_results ||--o{ moves : "game_id"
-
-    algorithms {
-        int id PK
-        string name UK "NOT NULL"
+    %% 完全戦略データベース (perfect_strategy.db)
+    perfect_strategy {
+        TEXT board "盤面の状態 (例: 'XO  O X  ')"
+        TEXT next_mark "次の手番のマーク (X/O)"
+        INTEGER best_move "最適な手の位置 (0-8)"
+        INTEGER score "評価値 (-1/0/1)"
     }
 
-    game_results {
-        int id PK
-        timestamp played_at "NOT NULL"
-        int algorithm_id FK "NOT NULL"
-        boolean human_is_first "NOT NULL"
-        char winner "NOT NULL"
+    %% 対戦履歴データベース (game_history.db)
+    game_history {
+        INTEGER game_id "ゲームID (自動採番)"
+        DATETIME played_at "対戦日時"
+        BOOLEAN is_human_first "人間が先手か"
+        TEXT winner "勝者 (HUMAN/COMPUTER/DRAW)"
+        TEXT moves "手順履歴 (JSON形式)"
     }
 
-    moves {
-        int game_id PK,FK
-        int move_number PK "NOT NULL"
-        int position "NOT NULL"
-        char mark "NOT NULL"
-    }
+    %% 制約
+    perfect_strategy ||--o{ game_history : "参照"
 
-    perfect_moves {
-        char state PK "NOT NULL"
-        char next_player PK "NOT NULL"
-        int best_move
-        int score "NOT NULL"
-    } 
+    %% 注釈
+    note "完全戦略データベース (perfect_strategy.db)" as note1
+    note "対戦履歴データベース (game_history.db)" as note2
+    note "制約:" as note3
+    note "- board: 長さ9の文字列 (空白/' '/X/O)" as note4
+    note "- next_mark: X/O" as note5
+    note "- best_move: 0-8の整数" as note6
+    note "- score: -1/0/1" as note7
+    note "- winner: HUMAN/COMPUTER/DRAW" as note8
+    note "- moves: [(位置, マーク), ...]" as note9 

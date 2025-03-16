@@ -1,8 +1,14 @@
 """
 すべての三目並べの盤面状態を生成するスクリプト
 
-このスクリプトは、可能なすべての盤面状態とその評価値を計算し、データベースに保存します。
+このスクリプトは、可能なすべての盤面状態とその評価値を計算し、perfect_strategy.dbに保存します。
 これにより、完全な戦略を実現する完全戦略エージェントのデータを提供します。
+
+生成されるデータ:
+- 盤面状態（'-XO'の9文字）
+- 次の手番（'X' または 'O'）
+- 最適な手の位置（0-8）
+- 評価値（1:X勝ち, 0:引分, -1:O勝ち）
 """
 
 import sqlite3
@@ -16,15 +22,14 @@ def create_states_table(cursor: sqlite3.Cursor) -> None:
     cursor.execute("""
     DROP TABLE IF EXISTS board_states
     """)
-    
+
     cursor.execute("""
     CREATE TABLE board_states (
-        state_id TEXT PRIMARY KEY,
-        board_state TEXT NOT NULL,
-        next_player TEXT NOT NULL,
-        best_move INTEGER,
-        evaluation INTEGER NOT NULL,
-        is_terminal BOOLEAN NOT NULL
+        board TEXT NOT NULL CHECK(length(board) = 9),
+        next_mark TEXT NOT NULL CHECK(next_mark IN ('X', 'O')),
+        best_move INTEGER CHECK(best_move BETWEEN 0 AND 8),
+        score INTEGER NOT NULL CHECK(score BETWEEN -1 AND 1),
+        PRIMARY KEY (board, next_mark)
     )
     """)
 
@@ -52,7 +57,7 @@ def check_winner(board: List[str]) -> Optional[str]:
     return None
 
 
-def evaluate_state(board: List[str], next_player: str) -> Tuple[int, Optional[int]]:
+def evaluate_state(board: List[str], next_mark: str) -> Tuple[int, Optional[int]]:
     """盤面を評価し、最適な手を決定します。
 
     Returns:
@@ -69,23 +74,18 @@ def evaluate_state(board: List[str], next_player: str) -> Tuple[int, Optional[in
     moves = []
     for i, cell in enumerate(board):
         if cell == "-":
-            board[i] = next_player
-            next_mark = "O" if next_player == "X" else "X"
-            eval_val, _ = evaluate_state(board, next_mark)
+            board[i] = next_mark
+            next_player = "O" if next_mark == "X" else "X"
+            eval_val, _ = evaluate_state(board, next_player)
             moves.append((eval_val, i))
             board[i] = "-"
 
-    if next_player == "X":
+    if next_mark == "X":
         best_eval = max(moves, key=lambda x: x[0])
         return best_eval[0], best_eval[1]
     else:
         best_eval = min(moves, key=lambda x: x[0])
         return best_eval[0], best_eval[1]
-
-
-def generate_state_id(board: List[str], next_player: str) -> str:
-    """盤面状態のユニークIDを生成します。"""
-    return f"{''.join(board)}_{next_player}"
 
 
 def is_valid_board(board: List[str]) -> bool:
@@ -97,7 +97,7 @@ def is_valid_board(board: List[str]) -> bool:
 
 def generate_all_states() -> None:
     """すべての可能な盤面状態を生成し、データベースに保存します。"""
-    db_path = Path(__file__).parent / "game_history.db"
+    db_path = Path(__file__).parent / "perfect_strategy.db"
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
@@ -111,7 +111,7 @@ def generate_all_states() -> None:
 
     for board_tuple in product(marks, repeat=9):
         board = list(board_tuple)
-        
+
         # 無効な盤面をスキップ
         if not is_valid_board(board):
             continue
@@ -119,39 +119,37 @@ def generate_all_states() -> None:
         # 勝者がいる場合はその時点で終了
         winner = check_winner(board)
         if winner:
-            is_terminal = True
-            evaluation = 1 if winner == "X" else -1
+            score = 1 if winner == "X" else -1
             best_move = None
         else:
-            is_terminal = "-" not in board
-            if is_terminal:
-                evaluation = 0
+            # 引き分けの場合
+            if "-" not in board:
+                score = 0
                 best_move = None
             else:
                 # 次のプレイヤーを決定
                 x_count = board.count("X")
                 o_count = board.count("O")
-                next_player = "O" if x_count > o_count else "X"
-                
+                next_mark = "O" if x_count > o_count else "X"
+
                 # 状態を評価
-                evaluation, best_move = evaluate_state(board.copy(), next_player)
-                
+                score, best_move = evaluate_state(board.copy(), next_mark)
+
                 # 状態を保存
-                state_id = generate_state_id(board, next_player)
-                if state_id not in processed_states:
+                board_str = ''.join(board)
+                state_key = (board_str, next_mark)
+                if state_key not in processed_states:
                     cursor.execute("""
-                    INSERT INTO board_states 
-                    (state_id, board_state, next_player, best_move, evaluation, is_terminal)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO board_states
+                    (board, next_mark, best_move, score)
+                    VALUES (?, ?, ?, ?)
                     """, (
-                        state_id,
-                        str(board),
-                        next_player,
+                        board_str,
+                        next_mark,
                         best_move,
-                        evaluation,
-                        is_terminal
+                        score
                     ))
-                    processed_states.add(state_id)
+                    processed_states.add(state_key)
                     count += 1
 
                     # 定期的にコミット
@@ -165,4 +163,4 @@ def generate_all_states() -> None:
 
 
 if __name__ == "__main__":
-    generate_all_states() 
+    generate_all_states()

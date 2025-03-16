@@ -40,4 +40,7 @@ Thumbs.db
 
 # Database
 *.db
-*.pyc 
+*.pyc
+
+# Node Modules
+node_modules/ 
