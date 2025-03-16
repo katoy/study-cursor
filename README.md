@@ -11,7 +11,6 @@ Cursorを使用して開発した三目並べゲームプロジェクトです�
   - ミニマックス（アルファベータ枝刈り付き）
   - 完全戦略（データベース使用）
 - 対戦履歴のデータベース保存
-- 統計情報の表示機能
 
 ## 必要条件
 
@@ -31,6 +30,31 @@ cd study-cursor
 ```bash
 python tictactoe_tk.py
 ```
+
+## データベース設計
+
+このプロジェクトでは2つのSQLiteデータベースを使用しています：
+
+1. 完全戦略データベース（perfect_strategy.db）
+   - 全ての可能な盤面とその最適手を格納
+   - 完全な戦略を実現するための参照テーブル
+   - テーブル構造：
+     - board: 盤面の状態（例: "XO  O X  "）
+     - next_mark: 次の手番のマーク（X/O）
+     - best_move: 最適な手の位置（0-8）
+     - score: 評価値（-1/0/1）
+
+2. 対戦履歴データベース（game_history.db）
+   - 各対戦の結果と手順を記録
+   - 統計情報の生成に使用
+   - テーブル構造：
+     - game_id: ゲームID（自動採番）
+     - played_at: 対戦日時
+     - is_human_first: 人間が先手か
+     - winner: 勝者（HUMAN/COMPUTER/DRAW）
+     - moves: 手順履歴（JSON形式）
+
+詳細なER図は `database/er_diagram.png` を参照してください。
 
 ## プロジェクト構成
 
